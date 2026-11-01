@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export interface Book {
   id: string;
@@ -16,6 +16,8 @@ export interface Book {
   releaseYear: number;
   volume: string;
   synopsis: string;
+  isFromApi?: boolean;
+  malUrl?: string;
   chapters: {
     title: string;
     content: string[];
@@ -206,114 +208,85 @@ export const INITIAL_BOOKS: Book[] = [
       },
     ],
   },
-  {
-    id: '5',
-    title: 'Vagabond - Edição Definitiva Vol. 1',
-    author: 'Takehiko Inoue',
-    category: 'Seinen',
-    coverUrl: 'https://cdn.myanimelist.net/images/manga/1/259070l.jpg',
-    rating: 4.9,
-    reviewsCount: 9840,
-    pages: 256,
-    currentPage: 45,
-    inLibrary: true,
-    isFavorite: false,
-    isCompleted: false,
-    releaseYear: 1998,
-    volume: 'Vol. 01',
-    synopsis:
-      'Após a Batalha de Sekigahara em 1600, o jovem Shinmen Takezo sobrevive em meio ao campo de batalha e decide percorrer o Japão como Miyamoto Musashi em busca da iluminação através do caminho da espada.',
-    chapters: [
-      {
-        title: 'Capítulo 1: Shinmen Takezo',
-        content: [
-          'Chovia sobre os milhares de corpos estendidos na planície de Sekigahara. Entre as lanças quebradas, dois jovens de dezessete anos respiravam com dificuldade: Takezo e Matahachi.',
-          '"Eu não vou morrer aqui", murmurou Takezo, olhando para o céu cinzento. A jornada para se tornar "Invencível sob o Sol" estava apenas começando.',
-        ],
-      },
-    ],
-  },
-  {
-    id: '6',
-    title: 'Chainsaw Man - Parte 1: Segurança Pública',
-    author: 'Tatsuki Fujimoto',
-    category: 'Ação & Aventura',
-    coverUrl: 'https://cdn.myanimelist.net/images/manga/3/216464l.jpg',
-    rating: 4.7,
-    reviewsCount: 15600,
-    pages: 190,
-    currentPage: 0,
-    inLibrary: false,
-    isFavorite: false,
-    isCompleted: false,
-    releaseYear: 2019,
-    volume: 'Vol. 01',
-    synopsis:
-      'Denji é um jovem extremamente pobre que caça demônios ao lado de Pochita, seu cão-demônio motosserra, para pagar as dívidas deixadas pelo pai. Após uma traição brutal, Pochita se funde ao coração de Denji.',
-    chapters: [
-      {
-        title: 'Capítulo 1: Cachorro e Motosserra',
-        content: [
-          'Tudo o que Denji queria era comer pão com geleia e ter uma vida normal. Mas o destino reservava um contrato de sangue.',
-          '"Denji... mostre-me os seus sonhos." Ao puxar a corda no peito, o rugido do motor ecoou pelo galpão abandonado.',
-        ],
-      },
-    ],
-  },
-  {
-    id: '7',
-    title: 'Vinland Saga - Livro 1',
-    author: 'Makoto Yukimura',
-    category: 'Seinen',
-    coverUrl: 'https://cdn.myanimelist.net/images/manga/2/188925l.jpg',
-    rating: 4.9,
-    reviewsCount: 8730,
-    pages: 460,
-    currentPage: 0,
-    inLibrary: false,
-    isFavorite: false,
-    isCompleted: false,
-    releaseYear: 2005,
-    volume: 'Vol. 01',
-    synopsis:
-      'Criado nas geladas terras da Islândia com histórias sobre a pacífica terra de Vinland, o jovem Thorfinn tem sua infância destruída pelo mercenário viking Askeladd e jura vingança em duelo.',
-    chapters: [
-      {
-        title: 'Capítulo 1: Os Normandos',
-        content: [
-          'Um verdadeiro guerreiro não precisa de uma espada. As palavras de Thors ecoavam sob a neve da Islândia enquanto os navios drakkar cortavam o mar do Norte.',
-        ],
-      },
-    ],
-  },
-  {
-    id: '8',
-    title: 'Naruto Gold Edition - Vol. 1',
-    author: 'Masashi Kishimoto',
-    category: 'Shonen',
-    coverUrl: 'https://cdn.myanimelist.net/images/manga/3/249658l.jpg',
-    rating: 4.8,
-    reviewsCount: 18900,
-    pages: 192,
-    currentPage: 192,
-    inLibrary: true,
-    isFavorite: true,
-    isCompleted: true,
-    releaseYear: 1999,
-    volume: 'Vol. 01',
-    synopsis:
-      'Naruto Uzumaki é um jovem ninja da Vila Oculta da Folha que carrega selada dentro de si a Raposa de Nove Caudas. Rejeitado pelos moradores, ele treina incansavelmente para se tornar o Hokage.',
-    chapters: [
-      {
-        title: 'Capítulo 1: Uzumaki Naruto!',
-        content: [
-          'Há doze anos, uma Raposa de Nove Caudas atacou a Vila Oculta da Folha. Apenas um grande líder ninja conseguiu detê-la sacrificando a própria vida: o Quarto Hokage.',
-          '"Eu nunca volto atrás na minha palavra! Esse é o meu jeito ninja de ser!"',
-        ],
-      },
-    ],
-  },
 ];
+
+function mapJikanItemToBook(item: any): Book {
+  const demographics = (item.demographics || []).map((d: any) => d.name?.toLowerCase());
+  const genres = (item.genres || []).map((g: any) => g.name?.toLowerCase());
+  const type = (item.type || '').toLowerCase();
+
+  let category: Book['category'] = 'Ação & Aventura';
+  if (type === 'manhwa' || type === 'manhua') {
+    category = 'Manhwa';
+  } else if (demographics.includes('shounen')) {
+    category = 'Shonen';
+  } else if (demographics.includes('seinen')) {
+    category = 'Seinen';
+  } else if (genres.includes('dark fantasy') || genres.includes('horror') || genres.includes('supernatural')) {
+    category = 'Fantasia Sombria';
+  }
+
+  const authorRaw = item.authors?.[0]?.name || 'Autor Mangaká';
+  const author = authorRaw.includes(',')
+    ? authorRaw
+        .split(',')
+        .reverse()
+        .map((s: string) => s.trim())
+        .join(' ')
+    : authorRaw;
+
+  const score10 = item.score || 9.0;
+  const rating = Math.min(5.0, Math.max(4.0, Number((score10 / 2).toFixed(1))));
+  const chaptersCount = item.chapters || 24;
+  const pages = Math.min(480, Math.max(180, chaptersCount * 8));
+  const synopsisText =
+    item.synopsis ||
+    'Edição digital oficial disponível para leitura imediata no Amazon Kindle Unlimited.';
+
+  return {
+    id: `mal-${item.mal_id}`,
+    title: item.title_english || item.title,
+    author,
+    category,
+    coverUrl:
+      item.images?.jpg?.large_image_url ||
+      item.images?.jpg?.image_url ||
+      'https://cdn.myanimelist.net/images/manga/2/253146l.jpg',
+    rating,
+    reviewsCount: item.scored_by || 12500,
+    pages,
+    currentPage: 0,
+    inLibrary: false,
+    isFavorite: false,
+    isCompleted: false,
+    releaseYear: item.published?.prop?.from?.year || 2020,
+    volume: item.volumes ? `${item.volumes} Vols` : 'Série em andamento',
+    synopsis: synopsisText,
+    isFromApi: true,
+    malUrl: item.url,
+    chapters: [
+      {
+        title: `Capítulo 1: ${item.title_english || item.title}`,
+        content: [
+          synopsisText,
+          `Publicado originalmente por ${author} (${
+            item.published?.prop?.from?.year || 'Edição Especial Kindle'
+          }). Esta obra possui nota ${(score10 || 9.0).toFixed(
+            2
+          )}/10 no MyAnimeList com mais de ${(item.scored_by || 10000).toLocaleString()} avaliações de leitores.`,
+          'Continue avançando as páginas abaixo para registrar seu progresso de leitura sincronizado via Kindle Whispersync.',
+        ],
+      },
+      {
+        title: 'Capítulo 2: Ficha Técnica & Bastidores',
+        content: [
+          `Gêneros: ${(item.genres || []).map((g: any) => g.name).join(', ') || category}.`,
+          `Status de Publicação: ${item.status || 'Em publicação'}.`,
+        ],
+      },
+    ],
+  };
+}
 
 interface KindleContextData {
   books: Book[];
@@ -325,6 +298,10 @@ interface KindleContextData {
   theme: ThemeColors;
   toggleTheme: () => void;
   readingStreakDays: number;
+  isLoadingApi: boolean;
+  apiError: string | null;
+  searchMangaFromApi: (query: string) => Promise<void>;
+  refreshTopMangaFromApi: () => Promise<void>;
 }
 
 const KindleContext = createContext<KindleContextData>({} as KindleContextData);
@@ -333,8 +310,70 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
   const [selectedBookId, setSelectedBookId] = useState<string>('1');
   const [isDark, setIsDark] = useState<boolean>(true);
+  const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
+
+  const mergeApiBooks = (apiBooks: Book[]) => {
+    setBooks((prev) => {
+      const existingTitles = new Set(
+        prev.map((b) => b.title.toLowerCase().slice(0, 12))
+      );
+      const uniqueNew = apiBooks.filter(
+        (b) => !existingTitles.has(b.title.toLowerCase().slice(0, 12)) && !prev.some((p) => p.id === b.id)
+      );
+      return [...prev, ...uniqueNew];
+    });
+  };
+
+  const refreshTopMangaFromApi = async () => {
+    setIsLoadingApi(true);
+    setApiError(null);
+    try {
+      const response = await fetch('https://api.jikan.moe/v4/top/manga?limit=12');
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+      const json = await response.json();
+      if (Array.isArray(json?.data)) {
+        const mapped = json.data.map(mapJikanItemToBook);
+        mergeApiBooks(mapped);
+      }
+    } catch (err: any) {
+      setApiError('Modo offline: exibindo catálogo local.');
+    } finally {
+      setIsLoadingApi(false);
+    }
+  };
+
+  const searchMangaFromApi = async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return;
+    setIsLoadingApi(true);
+    setApiError(null);
+    try {
+      const response = await fetch(
+        `https://api.jikan.moe/v4/manga?q=${encodeURIComponent(trimmed)}&limit=10&sfw=true`
+      );
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+      const json = await response.json();
+      if (Array.isArray(json?.data)) {
+        const mapped = json.data.map(mapJikanItemToBook);
+        mergeApiBooks(mapped);
+      }
+    } catch (err: any) {
+      setApiError('Não foi possível buscar na API Jikan no momento.');
+    } finally {
+      setIsLoadingApi(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshTopMangaFromApi();
+  }, []);
 
   const toggleFavorite = (id: string) => {
     setBooks((prev) =>
@@ -375,6 +414,10 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         theme: isDark ? darkTheme : lightTheme,
         toggleTheme,
         readingStreakDays: 14,
+        isLoadingApi,
+        apiError,
+        searchMangaFromApi,
+        refreshTopMangaFromApi,
       }}
     >
       {children}

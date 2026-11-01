@@ -9,6 +9,7 @@ import {
   Image,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,7 +27,17 @@ const CATEGORIES = [
 export default function Tela1({ navigation: navProp }: { navigation?: any }) {
   const navHook = useNavigation<any>();
   const navigation = navProp || navHook;
-  const { books, theme, toggleTheme, setSelectedBookId, toggleFavorite } = useKindle();
+  const {
+    books,
+    theme,
+    toggleTheme,
+    setSelectedBookId,
+    toggleFavorite,
+    isLoadingApi,
+    apiError,
+    searchMangaFromApi,
+    refreshTopMangaFromApi,
+  } = useKindle();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Explorar');
 
@@ -77,11 +88,22 @@ export default function Tela1({ navigation: navProp }: { navigation?: any }) {
           <Ionicons name="search-outline" size={19} color={theme.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Pesquisar no Kindle..."
+            placeholder="Pesquisar no Kindle ou MyAnimeList..."
             placeholderTextColor={theme.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onSubmitEditing={() => searchMangaFromApi(searchQuery)}
+            returnKeyType="search"
           />
+          {searchQuery.length > 1 && (
+            <TouchableOpacity
+              onPress={() => searchMangaFromApi(searchQuery)}
+              style={{ marginRight: 4 }}
+              accessibilityLabel="Buscar na API Jikan"
+            >
+              <Ionicons name="cloud-download-outline" size={18} color={theme.primary} />
+            </TouchableOpacity>
+          )}
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
@@ -285,17 +307,32 @@ export default function Tela1({ navigation: navProp }: { navigation?: any }) {
           </ScrollView>
         )}
 
-        {/* Seção 2: Para você em Mangás, Quadrinhos e Graphic Novels (inspirado no PDF) */}
+        {/* Seção 2: Para você em Mangás, Quadrinhos e Graphic Novels (inspirado no PDF + Jikan API) */}
         <View style={[styles.sectionHeader, { marginTop: 12 }]}>
           <View style={styles.sectionTitleRow}>
             <Ionicons name="sparkles-outline" size={18} color={theme.accent} />
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Para você em Mangás & Manhwas
+              Top Mangás & Manhwas (Jikan API)
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={refreshTopMangaFromApi}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          >
+            {isLoadingApi ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <Ionicons name="refresh" size={16} color={theme.primary} />
+            )}
+            <Text style={[styles.seeAllText, { color: theme.primary }]}>
+              {isLoadingApi ? 'Sincronizando...' : 'Atualizar API'}
+            </Text>
+          </TouchableOpacity>
         </View>
         <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-          Recomendações baseadas nas suas leituras recentes no Kindle Unlimited
+          {apiError
+            ? apiError
+            : 'Catálogo em tempo real conectado à Jikan REST API v4 (MyAnimeList)'}
         </Text>
 
         <ScrollView
@@ -312,6 +349,16 @@ export default function Tela1({ navigation: navProp }: { navigation?: any }) {
             >
               <View style={styles.coverWrapper}>
                 <Image source={{ uri: book.coverUrl }} style={styles.bookCover} />
+                {book.isFromApi && (
+                  <View
+                    style={[
+                      styles.apiBadge,
+                      { backgroundColor: 'rgba(56, 189, 248, 0.92)' },
+                    ]}
+                  >
+                    <Text style={styles.apiBadgeText}>API</Text>
+                  </View>
+                )}
                 <View
                   style={[
                     styles.categoryTag,
@@ -526,6 +573,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  apiBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  apiBadgeText: {
+    color: '#0F1115',
+    fontSize: 9,
+    fontWeight: '800',
   },
   completedRibbon: {
     position: 'absolute',
