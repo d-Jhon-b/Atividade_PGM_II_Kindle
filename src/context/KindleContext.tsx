@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 export interface Book {
   id: string;
@@ -327,7 +327,7 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  const refreshTopMangaFromApi = async () => {
+  const refreshTopMangaFromApi = useCallback(async () => {
     setIsLoadingApi(true);
     setApiError(null);
     try {
@@ -340,12 +340,12 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const mapped = json.data.map(mapJikanItemToBook);
         mergeApiBooks(mapped);
       }
-    } catch (err: any) {
+    } catch {
       setApiError('Modo offline: exibindo catálogo local.');
     } finally {
       setIsLoadingApi(false);
     }
-  };
+  }, []);
 
   const searchMangaFromApi = async (query: string) => {
     const trimmed = query.trim();
@@ -364,7 +364,7 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const mapped = json.data.map(mapJikanItemToBook);
         mergeApiBooks(mapped);
       }
-    } catch (err: any) {
+    } catch {
       setApiError('Não foi possível buscar na API Jikan no momento.');
     } finally {
       setIsLoadingApi(false);
@@ -373,7 +373,7 @@ export const KindleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     refreshTopMangaFromApi();
-  }, []);
+  }, [refreshTopMangaFromApi]);
 
   const toggleFavorite = (id: string) => {
     setBooks((prev) =>
